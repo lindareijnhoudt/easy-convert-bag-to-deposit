@@ -17,16 +17,19 @@ package nl.knaw.dans.easy.bag2deposit.ddm
 
 import better.files.File
 import nl.knaw.dans.easy.bag2deposit.InvalidBagException
+import nl.knaw.dans.easy.bag2deposit.collections.Collections.getCollectionsMap
 import nl.knaw.dans.easy.bag2deposit.ddm.LanguageRewriteRule.logNotMappedLanguages
 import nl.knaw.dans.easy.bag2deposit.ddm.ReportRewriteRule.logBriefRapportTitles
 import nl.knaw.dans.lib.logging.DebugEnhancedLogging
+import org.apache.commons.configuration.PropertiesConfiguration
 
 import scala.util.{ Failure, Success, Try }
 import scala.xml.transform.{ RewriteRule, RuleTransformer }
 import scala.xml.{ Elem, Node, NodeSeq }
 
-case class DdmTransformer(cfgDir: File, collectionsMap: Map[String, Elem] = Map.empty) extends DebugEnhancedLogging {
+case class DdmTransformer(cfgDir: File, properties: PropertiesConfiguration = null) extends DebugEnhancedLogging {
 
+  lazy val collectionsMap: Map[String, Elem] = getCollectionsMap(cfgDir, properties)
   val reportRewriteRule: ReportRewriteRule = ReportRewriteRule(cfgDir)
   private val acquisitionRewriteRule: AcquisitionRewriteRule = AcquisitionRewriteRule(cfgDir)
   private val profileTitleRuleTransformer = new RuleTransformer(

@@ -34,7 +34,7 @@ class RewriteSpec extends AnyFlatSpec with SchemaSupport with Matchers with DdmS
     dansDoiPrefixes = "10.17026/,10.5072/".split(","),
     dataverseIdAutority = "10.80270",
     bagIndex = BagIndex(new URI("http://localhost:20120/")),
-    ddmTransformer = DdmTransformer(cfgDir, Map.empty),
+    ddmTransformer = DdmTransformer(cfgDir)
   )
   override val schema = "https://easy.dans.knaw.nl/schemas/md/ddm/ddm.xsd"
 
