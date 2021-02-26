@@ -16,18 +16,22 @@
 package nl.knaw.dans.easy.bag2deposit.ddm
 
 import better.files.File
-import nl.knaw.dans.easy.bag2deposit.Fixture.{ DdmSupport, SchemaSupport }
+import nl.knaw.dans.easy.bag2deposit.Fixture.{ DdmSupport, FileSystemSupport, SchemaSupport }
 import nl.knaw.dans.easy.bag2deposit.ddm.LanguageRewriteRule.logNotMappedLanguages
 import nl.knaw.dans.easy.bag2deposit.{ BagIndex, Configuration, EasyConvertBagToDepositApp, InvalidBagException, normalized, parseCsv }
 import org.apache.commons.csv.CSVRecord
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import java.net.URI
+import java.net.{ URI, UnknownHostException }
 import java.util.UUID
+
+import better.files.File.currentWorkingDirectory
+import com.sun.jersey.api.client.ClientHandlerException
+import org.apache.commons.configuration.PropertiesConfiguration
+
 import scala.util.{ Failure, Success, Try }
 
-class RewriteSpec extends AnyFlatSpec with SchemaSupport with Matchers with DdmSupport {
+class RewriteSpec extends AnyFlatSpec with SchemaSupport with FileSystemSupport with Matchers with DdmSupport {
   private val cfgDir: File = File("src/main/assembly/dist/cfg")
   private val cfg = new Configuration(
     "test version",
@@ -290,14 +294,23 @@ class RewriteSpec extends AnyFlatSpec with SchemaSupport with Matchers with DdmS
       Success(normalized(expectedDdm))
   }
 
+  val distSrc = File("src/main/assembly/dist")
+  private def distDir(fedoraUrl: String) = {
+
+    distSrc.copyToDirectory(testDir)
+    (testDir / "dist" / "cfg" / "application.properties").writeText(
+      (distSrc / "cfg" / "application.properties").contentAsString
+        .replace("http://localhost:20120/", fedoraUrl)
+    )
+  }
+
   "ddmTransformer" should "add inCollection for archaeology" in {
     val ddmIn = ddm(title = "blabla", audience = "D37000", dcmi =
         <ddm:dcmiMetadata>
         </ddm:dcmiMetadata>
     )
-    val transformer = cfg.ddmTransformer.copy(
-      collectionsMap = Map("easy-dataset:123" -> <inCollection>mocked</inCollection>)
-    )
+    val transformer = cfg.ddmTransformer
+    transformer.collectionsMap = Map("easy-dataset:123" -> <inCollection>mocked</inCollection>)
 
     transformer.transform(ddmIn, "easy-dataset:456").map(normalized) shouldBe Success(normalized(ddmIn))
     transformer.transform(ddmIn, "easy-dataset:123").map(normalized) shouldBe Success(normalized(
@@ -309,14 +322,28 @@ class RewriteSpec extends AnyFlatSpec with SchemaSupport with Matchers with DdmS
     // content of the <inCollection> element is validated in CollectionsSpec.collectionDatasetIdToInCollection
   }
 
+  it should "fail when fedora is configured but not available" in {
+    distDir(fedoraUrl = "https://does.not.exist.dans.knaw.nl")
+    val properties = new PropertiesConfiguration() {
+      setDelimiterParsingDisabled(true)
+      load((testDir / "dist" / "cfg" / "application.properties").toJava)
+    }
+    val transformer = DdmTransformer(distSrc / "cfg", properties)
+    Try(transformer.initializeCollectionMap) should matchPattern {
+      case Failure(e) if e.getCause.isInstanceOf[ClientHandlerException] &&
+        e.getCause.getCause.isInstanceOf[UnknownHostException] &&
+        e.getCause.getCause.getMessage.contains("does.not.exist.dans.knaw.nl") =>
+    }
+  }
+
   it should "add inCollection for other than archaeology" in pendingUntilFixed {
     val ddmIn = ddm(title = "blabla", audience = "Z99000", dcmi =
         <ddm:dcmiMetadata>
         </ddm:dcmiMetadata>
     )
-    val transformer = cfg.ddmTransformer.copy(
-      collectionsMap = Map("easy-dataset:123" -> <inCollection>mocked</inCollection>)
-    )
+    val transformer = cfg.ddmTransformer
+    transformer.collectionsMap = Map("easy-dataset:123" -> <inCollection>mocked</inCollection>)
+
 
     transformer.transform(ddmIn, "easy-dataset:456").map(normalized) shouldBe Success(normalized(ddmIn))
     transformer.transform(ddmIn, "easy-dataset:123").map(normalized) shouldBe Success(normalized(

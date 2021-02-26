@@ -29,7 +29,7 @@ import scala.xml.{ Elem, Node, NodeSeq }
 
 case class DdmTransformer(cfgDir: File, properties: PropertiesConfiguration = null) extends DebugEnhancedLogging {
 
-  lazy val collectionsMap: Map[String, Elem] = getCollectionsMap(cfgDir, properties)
+  var collectionsMap: Map[String, Elem] = Map.empty
   val reportRewriteRule: ReportRewriteRule = ReportRewriteRule(cfgDir)
   private val acquisitionRewriteRule: AcquisitionRewriteRule = AcquisitionRewriteRule(cfgDir)
   private val profileTitleRuleTransformer = new RuleTransformer(
@@ -46,7 +46,6 @@ case class DdmTransformer(cfgDir: File, properties: PropertiesConfiguration = nu
   private val standardRuleTransformer = new RuleTransformer(
     LanguageRewriteRule(cfgDir / "languages.csv"),
   )
-
   private case class ArchaeologyRewriteRule(additionalElements: NodeSeq) extends RewriteRule {
     override def transform(n: Node): Seq[Node] = {
       if (n.label != "dcmiMetadata") n
@@ -57,6 +56,11 @@ case class DdmTransformer(cfgDir: File, properties: PropertiesConfiguration = nu
     }
   }
 
+  def initializeCollectionMap = {
+     if( collectionsMap.isEmpty && properties != null)
+      collectionsMap = getCollectionsMap(cfgDir, properties)
+  }
+
   def transform(ddmIn: Node, datasetId: String): Try[Node] = {
     if (!(ddmIn \ "profile" \ "audience").text.contains("D37000")) {
       // not archaeological
@@ -64,6 +68,7 @@ case class DdmTransformer(cfgDir: File, properties: PropertiesConfiguration = nu
       Success(standardRuleTransformer(ddmIn))
     }
     else {
+      initializeCollectionMap
       val inCollection = collectionsMap.get(datasetId).toSeq
 
       // a title in the profile will not change but may produce something for dcmiMetadata
