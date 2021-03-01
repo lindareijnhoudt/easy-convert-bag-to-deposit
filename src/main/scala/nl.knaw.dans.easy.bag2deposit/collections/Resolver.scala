@@ -15,11 +15,12 @@
  */
 package nl.knaw.dans.easy.bag2deposit.collections
 
+import nl.knaw.dans.lib.logging.DebugEnhancedLogging
 import scalaj.http.Http
 
 import scala.util.{ Failure, Success, Try }
 
-case class Resolver() {
+case class Resolver() extends DebugEnhancedLogging{
 
   def getDatasetId(id: String): Try[String] = {
     id.slice(0, 3) match {
@@ -36,9 +37,11 @@ case class Resolver() {
         response
           .header("Location")
           .map(_.replaceAll(".*/", "").replace("%3A", ":"))
-          .getOrElse(throw new Exception(s"no location header returned by $url - ${ response.body }"))
+          .getOrElse(s"no location header returned by $url - ${ response.body }")
       case response =>
-        throw new Exception(s"Not expected response code from '$url' ${ response.code } - ${ response.body }", null)
+        logger.error(s"Not expected response code from '$url' ${ response.code } - ${ response.body }")
+          s"no dataset-id found for $url"
+        //throw new Exception(s"Not expected response code from '$url' ${ response.code } - ${ response.body }", null)
     }
   }
 }
